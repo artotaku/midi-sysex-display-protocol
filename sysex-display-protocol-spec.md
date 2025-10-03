@@ -1,5 +1,5 @@
 # MIDI SYSEX Display Protocol Specification
-Version 1.0.0-draft.2
+Version 1.0.0-draft.3
 
 ## Overview
 This document specifies the MIDI System Exclusive (SYSEX) message format for controlling a vector-based display device. The protocol supports basic drawing primitives (lines, rectangles, circles), text rendering, bitmap icons, and interactive MIDI control elements. Commands can be combined and sequenced to create complex display updates, with support for chunking large updates across multiple messages.
@@ -29,7 +29,7 @@ This document specifies the MIDI System Exclusive (SYSEX) message format for con
 | [Rectangle](#rectangle-drawing-0x15) | 0x15 | 13 | Draws filled or outlined rectangle |
 | [Icon](#icon-drawing-0x16) | 0x16 | 8 | Draws a predefined bitmap icon |
 | [Circle](#circle-drawing-0x17) | 0x17 | 10 | Draws filled or outlined circle |
-| [Control](#control-drawing-0x18) | 0x18 | 9+n | Draws interactive MIDI control element |
+| [Control](#control-drawing-0x18) | 0x18 | 11+n | Draws interactive MIDI control element |
 
 All commands are terminated with delimiter byte 0x7F.
 
@@ -140,9 +140,9 @@ Draws a line between two points.
 - line_style: Line style (0=solid, 1=dotted1, 2=dotted2, 3=dotted3)
 
 Example:
-Draw a line at y=32, thickness 2:
+Draw a line from (0,32) to (255,32), thickness 2, solid style:
 ```
-F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 13 00 00 00 20 07 7F 00 20 01 02 7F F7
+F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 13 00 00 20 00 3F 03 20 00 01 02 00 7F F7
 ```
 
 #### Text Drawing (0x14)
@@ -158,7 +158,7 @@ Renders text using built-in bitmap fonts.
 Example:
 Draw "Hello" at (10,10), normal size:
 ```
-F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 14 00 0A 00 0A 01 00 48 65 6C 6C 6F 7F F7
+F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 14 0A 00 0A 00 01 00 48 65 6C 6C 6F 7F F7
 ```
 
 #### Rectangle Drawing (0x15)
@@ -174,6 +174,12 @@ Draws a filled or outlined rectangle.
 - filled: 0=outline only, 1=filled
 - line_style: Line style (0=solid, 1=dotted1, 2=dotted2, 3=dotted3)
 
+Example:
+Draw a filled rectangle at (10,10) with width=50, height=20, color=1:
+```
+F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 15 0A 00 0A 00 32 00 14 00 01 01 01 00 7F F7
+```
+
 #### Circle Drawing (0x17)
 Draws a filled or outlined circle.
 ```
@@ -188,7 +194,7 @@ Draws a filled or outlined circle.
 Example:
 Draw a filled circle with diameter 20 at (30,20):
 ```
-F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 17 00 1E 00 14 00 14 01 01 01 7F F7
+F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 17 1E 00 14 00 14 00 01 01 01 7F F7
 ```
 
 #### Icon Drawing (0x16)
@@ -203,17 +209,16 @@ Draws a predefined bitmap icon. Icons are bitmap patterns stored in the device's
 Example:
 Draw an icon at (20,30), normal size:
 ```
-F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 16 00 14 00 1E 00 01 00 7F F7
+F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 16 14 00 1E 00 00 01 00 7F F7
 ```
 
 #### Control Drawing (0x18)
 Draws an interactive MIDI control element with dynamic value display.
 ```
-18 [type] [row] [column] [style] [color] [value_low] [value_high] [label...] 7F
+18 [type] [x_low] [x_high] [y_low] [y_high] [style] [color] [value_low] [value_high] [label...] 7F
 ```
 - type: Control type (0=fader, 1=knob, 2=button, 3=encoder)
-- row: Row index in the control grid 0-126 [0x00-0x7E]
-- column: Column index in the control grid 0-126 [0x00-0x7E]
+- x, y: Top-left coordinates (12-bit encoded as low 6 bits then high 6 bits, range 0-4095)
 - style: Visual style and orientation
   - For faders: 0=vertical, 1=horizontal
   - For knobs/encoders: 0=dot indicator, 1=line indicator, 2=fill indicator
@@ -223,17 +228,17 @@ Draws an interactive MIDI control element with dynamic value display.
 - label: ASCII encoded control label, terminated by command delimiter (0x7F)
 
 Example:
-Draw a vertical fader labeled "Volume" at grid position (1,2) with value at 50%, color 1:
+Draw a vertical fader labeled "Volume" at coordinates (100,50) with value at 50%, color 1:
 ```
-F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 18 00 01 02 00 01 00 7F 56 6F 6C 75 6D 65 7F F7
+F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 18 00 24 01 32 00 00 01 3E 1F 56 6F 6C 75 6D 65 7F F7
 ```
 Breakdown:
 - type = 0 (fader)
-- row = 1
-- column = 2
+- x = 100 (encoded as low=0x24, high=0x01)
+- y = 50 (encoded as low=0x32, high=0x00)
 - style = 0 (vertical)
 - color = 1
-- value = 2047 (about 50%, encoded as low=0x00, high=0x7F)
+- value = 2046 (about 50%, encoded as low=0x3E, high=0x1F)
 - label = "Volume" in ASCII (56 6F 6C 75 6D 65)
 
 ## Implementation Notes
