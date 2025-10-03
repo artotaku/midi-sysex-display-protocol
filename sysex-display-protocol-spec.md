@@ -1,8 +1,25 @@
 # MIDI SYSEX Display Protocol Specification
-Version 1.0.0-draft.1
+Version 1.0.0-draft.2
 
 ## Overview
 This document specifies the MIDI System Exclusive (SYSEX) message format for controlling a vector-based display device. The protocol supports basic drawing primitives (lines, rectangles, circles), text rendering, bitmap icons, and interactive MIDI control elements. Commands can be combined and sequenced to create complex display updates, with support for chunking large updates across multiple messages.
+
+## Table of Contents
+- [Command Summary](#command-summary)
+- [Display Specifications](#display-specifications)
+- [SYSEX Message Format](#sysex-message-format)
+  - [Header Structure](#header-structure)
+  - [Command Chunking](#command-chunking)
+  - [Parameter Encoding](#parameter-encoding)
+  - [Command Delimiter](#command-delimiter)
+- [Drawing Commands](#drawing-commands)
+  - [Line Drawing (0x13)](#line-drawing-0x13)
+  - [Text Drawing (0x14)](#text-drawing-0x14)
+  - [Rectangle Drawing (0x15)](#rectangle-drawing-0x15)
+  - [Circle Drawing (0x17)](#circle-drawing-0x17)
+  - [Icon Drawing (0x16)](#icon-drawing-0x16)
+  - [Control Drawing (0x18)](#control-drawing-0x18)
+- [Implementation Notes](#implementation-notes)
 
 ## Command Summary
 | Command | ID | Bytes | Description |
