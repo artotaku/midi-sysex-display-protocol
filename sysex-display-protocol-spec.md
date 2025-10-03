@@ -1,5 +1,5 @@
 # MIDI SYSEX Display Protocol Specification
-Version 1.0.0-draft.3
+Version 1.0.0-draft.4
 
 ## Overview
 This document specifies the MIDI System Exclusive (SYSEX) message format for controlling a vector-based display device. The protocol supports basic drawing primitives (lines, rectangles, circles), text rendering, bitmap icons, and interactive MIDI control elements. Commands can be combined and sequenced to create complex display updates, with support for chunking large updates across multiple messages.
@@ -29,7 +29,7 @@ This document specifies the MIDI System Exclusive (SYSEX) message format for con
 | [Rectangle](#rectangle-drawing-0x15) | 0x15 | 13 | Draws filled or outlined rectangle |
 | [Icon](#icon-drawing-0x16) | 0x16 | 8 | Draws a predefined bitmap icon |
 | [Circle](#circle-drawing-0x17) | 0x17 | 10 | Draws filled or outlined circle |
-| [Control](#control-drawing-0x18) | 0x18 | 11+n | Draws interactive MIDI control element |
+| [Control](#control-drawing-0x18) | 0x18 | 15+n | Draws interactive MIDI control element |
 
 All commands are terminated with delimiter byte 0x7F.
 
@@ -95,16 +95,16 @@ F7
 
 # Second chunk (count=2, seq=1)
 F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 02 01
-   18 00 01 02 00 01 00 7F 4F 4B 7F              # OK button
-   16 00 32 00 32 01 01 00 7F                    # Icon
+   18 02 24 01 32 00 00 01 00 00 01 00 00 00 4F 4B 7F    # OK button at (100,50), range 0-1, value 0
+   16 32 00 32 00 01 01 00 7F                            # Icon
 F7
 ```
 
 Example - Create a button with an icon:
 ```
 F0 [id1] [id2] [id3] [proto1] [proto2] 00 03
-   18 02 00 01 00 01 00 00 53 45 54 7F           # Button labeled "SET" at grid (0,1)
-   16 00 01 00 01 02 01 00 7F                    # Icon index 2 next to button
+   18 02 14 00 1E 00 00 01 00 00 01 00 00 00 53 45 54 7F    # Button labeled "SET" at (20,30), range 0-1, value 0
+   16 01 00 01 00 02 01 00 7F                               # Icon index 2 next to button
 F7
 ```
 
@@ -215,7 +215,7 @@ F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 16 14 00 1E 00 00 01 00 7F F7
 #### Control Drawing (0x18)
 Draws an interactive MIDI control element with dynamic value display.
 ```
-18 [type] [x_low] [x_high] [y_low] [y_high] [style] [color] [value_low] [value_high] [label...] 7F
+18 [type] [x_low] [x_high] [y_low] [y_high] [style] [color] [min_low] [min_high] [max_low] [max_high] [value_low] [value_high] [label...] 7F
 ```
 - type: Control type (0=fader, 1=knob, 2=button, 3=encoder)
 - x, y: Top-left coordinates (12-bit encoded as low 6 bits then high 6 bits, range 0-4095)
@@ -224,13 +224,15 @@ Draws an interactive MIDI control element with dynamic value display.
   - For knobs/encoders: 0=dot indicator, 1=line indicator, 2=fill indicator
   - For buttons: 0=momentary, 1=toggle
 - color: Color value 0-126 [0x00-0x7E]
-- value: Current value (12-bit encoded as low 6 bits then high 6 bits, range 0-4095)
+- min: Minimum value for the control range (12-bit encoded as low 6 bits then high 6 bits, range 0-4095)
+- max: Maximum value for the control range (12-bit encoded as low 6 bits then high 6 bits, range 0-4095)
+- value: Current value (12-bit encoded as low 6 bits then high 6 bits, range min-max)
 - label: ASCII encoded control label, terminated by command delimiter (0x7F)
 
 Example:
-Draw a vertical fader labeled "Volume" at coordinates (100,50) with value at 50%, color 1:
+Draw a vertical fader labeled "Volume" at coordinates (100,50) with range 0-1000, current value 500, color 1:
 ```
-F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 18 00 24 01 32 00 00 01 3E 1F 56 6F 6C 75 6D 65 7F F7
+F0 [id1] [id2] [id3] [proto1] [proto2] 00 03 18 00 24 01 32 00 00 01 00 00 28 0F 34 07 56 6F 6C 75 6D 65 7F F7
 ```
 Breakdown:
 - type = 0 (fader)
@@ -238,7 +240,9 @@ Breakdown:
 - y = 50 (encoded as low=0x32, high=0x00)
 - style = 0 (vertical)
 - color = 1
-- value = 2046 (about 50%, encoded as low=0x3E, high=0x1F)
+- min = 0 (encoded as low=0x00, high=0x00)
+- max = 1000 (encoded as low=0x28, high=0x0F)
+- value = 500 (encoded as low=0x34, high=0x07)
 - label = "Volume" in ASCII (56 6F 6C 75 6D 65)
 
 ## Implementation Notes
